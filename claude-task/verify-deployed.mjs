@@ -53,7 +53,7 @@ async function canvasDraws(page, selector) {
 }
 
 /** Скачать для работы без интернета → отключить сеть → перезагрузить. model=false: 3D недоступен, проверяем, что страница и скрипты открываются из кэша. */
-async function offlineRoundTrip(page, context, {model, shot}) {
+async function offlineRoundTrip(page, context, {model, shot, problems = [], webkit: isWebkit = false}) {
   const supported = await page.evaluate(() => isSecureContext && 'serviceWorker' in navigator && typeof caches !== 'undefined');
   if (!supported) return skipped('нет https/service worker в этом браузере');
   await openBrowse(page);   // на телефоне панель «Обзор» (а в ней кнопка настроек) скрыта, пока её не откроешь
@@ -63,9 +63,21 @@ async function offlineRoundTrip(page, context, {model, shot}) {
   const controlled = await page.evaluate(async () => { await navigator.serviceWorker.ready; return !!(await navigator.serviceWorker.getRegistration()); });
   if (!controlled) throw new Error('service worker не зарегистрирован');
   await page.locator('.about-dialog .close').click();
+  // Сначала содержимое кэша: интерфейс (страница, скрипты, стили) и данные должны лежать на устройстве.
+  const cached = await page.evaluate(async () => { const out = {}; for (const key of await caches.keys()) out[key] = (await (await caches.open(key)).keys()).length; return out; });
+  const shellKey = Object.keys(cached).find(key => key.startsWith('atlas-shell-'));
+  if (!shellKey || cached[shellKey] < 4) throw new Error(`интерфейс не сохранён в кэше: ${JSON.stringify(cached)}`);
+  if ((cached['atlas-data-v1'] ?? 0) < 10) throw new Error(`данные не сохранены в кэше: ${JSON.stringify(cached)}`);
+  const cacheNote = `в кэше: интерфейс ${cached[shellKey]} файлов, данные ${cached['atlas-data-v1']} файлов`;
   await context.setOffline(true);
+  const problemsBefore = problems.length;
   try {
-    await page.reload({waitUntil: 'load', timeout: 120000});
+    try { await page.reload({waitUntil: 'load', timeout: 120000}); }
+    catch (error) {
+      // Эмуляция «офлайна» в WebKit рвёт запрос раньше service worker: открытие без сети там проверить нельзя.
+      if (isWebkit && /internal error/i.test(String(error?.message))) { problems.length = problemsBefore; return skipped(`${cacheNote}; перезагрузка без сети в headless-WebKit недоступна (ограничение эмуляции) — проверьте на устройстве`); }
+      throw error;
+    }
     if (model) {
       await waitReady(page, 180000);
       if (number(await counter(page)) !== 2229) throw new Error('после перезагрузки без сети модель не открылась');
@@ -74,7 +86,7 @@ async function offlineRoundTrip(page, context, {model, shot}) {
       if (!/Атлас/.test(await page.title())) throw new Error('без сети открылась не та страница');
     }
     await shot?.('без-сети');
-    return model ? '' : 'страница, скрипты и данные открываются из кэша (3D в этом браузере недоступен)';
+    return model ? cacheNote : `${cacheNote}; страница открывается без сети (3D в этом браузере недоступен)`;
   } finally { await context.setOffline(false); }
 }
 
@@ -100,7 +112,7 @@ async function runSuite(suite, type, contextOptions, {full}) {
   const webgl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => false);
   if (!webgl) {
     record(suite, '3D (WebGL) в этом headless-браузере', 'skip', 'WebGL недоступен — 3D-проверки пропущены; проверьте вручную на реальном устройстве');
-    await step(suite, 'работа без интернета без 3D (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: false, shot}));
+    await step(suite, 'работа без интернета без 3D (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: false, shot, problems, webkit: type === webkit}));
     await shot('без-webgl'); await browser.close(); return;
   }
 
@@ -182,7 +194,7 @@ async function runSuite(suite, type, contextOptions, {full}) {
     });
   }
 
-  await step(suite, 'работа без интернета (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: true, shot}));
+  await step(suite, 'работа без интернета (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: true, shot, problems, webkit: type === webkit}));
 
   await step(suite, 'нет ошибок в консоли и неудачных запросов', async () => {
     const unique = [...new Set(problems)];
