@@ -257,6 +257,7 @@ kbd{font:500 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fain
 /* Section panel, favorites, toast */
 .section-panel{position:absolute;top:66px;right:376px;z-index:8;width:min(320px,calc(100% - 24px));padding:14px 16px 16px}
 .section-panel .panel-head{padding:0 0 10px}
+.section-panel .seg.wide button{padding:0 4px;min-width:0;font-size:12px}   /* три вкладки плоскостей должны помещаться в панель */
 .section-panel .slider-label{display:block;margin:12px 0 2px;font-size:12.5px;font-weight:600}
 .section-panel .range{margin:10px 0 12px}
 .section-panel .range:disabled{opacity:.45;cursor:not-allowed}
