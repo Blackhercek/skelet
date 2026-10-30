@@ -129,7 +129,7 @@ async function runSuite(suite, type, contextOptions, {full}) {
       await slow.screenshot({path: path.join(outDir, `${suite}-заставка.png`)}).catch(() => {});
       await slow.locator('.start').waitFor({state: 'detached', timeout: 300000});
       if (number(await counter(slow)) !== 2229) throw new Error('после заставки счётчик структур не 2229');
-    } finally { await slowContext.close(); }
+    } finally { await slowContext.close(); await page.bringToFront(); }   // WebKit иначе считает первую страницу фоновой и почти не отдаёт кадры
   });
   await step(suite, 'поиск по-русски и карточка структуры', async () => {
     await openBrowse(page);
