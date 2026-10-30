@@ -274,6 +274,7 @@ kbd{font:500 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fain
 @media (max-width:900px),(max-height:540px){
  .section-panel{right:12px;top:calc(max(10px,env(safe-area-inset-top)) + 100px)}
  .canvas-tools{max-width:130px}
+ .install-hint{top:calc(max(10px,env(safe-area-inset-top)) + 96px)}   /* ниже двух рядов кнопок */
 }
 
 /* Quiz */
