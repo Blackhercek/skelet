@@ -4,6 +4,7 @@ import AnatomyScene,{type SceneApi} from './scene';
 import {saveSnapshot} from './snapshot';
 import OrganViewer from './organ-viewer';
 import AboutDialog from './about-dialog';
+import StartScreen from './start-screen';
 import QuizPanel,{type QuizScene} from './quiz';
 import {OrganIcon} from './icons';
 import {ORGANS,type OrganId} from './organs';
@@ -37,6 +38,9 @@ const fillStyle=(value:number)=>({'--fill':`${value}%`} as CSSProperties);
 export default function Home(){
  const [sex,setSex]=useState<AnatomySex>('male'),[atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(()=>initialState('male'));
  const [progress,setProgress]=useState(0),[error,setError]=useState(''),[chosen,setChosen]=useState<Concept|null>(null);
+ // The start screen covers the interface until the body is loaded for the first time; later reloads (sex, quality) use the small card.
+ const [booted,setBooted]=useState(false);
+ useEffect(()=>{if(atlas&&progress>=100)setBooted(true);},[atlas,progress]);
  const [tab,setTab]=useState<Tab>('systems'),[query,setQuery]=useState(''),[searching,setSearching]=useState(false),[active,setActive]=useState(0);
  const [organ,setOrgan]=useState<OrganId|null>(null),[about,setAbout]=useState(false),[browseOpen,setBrowseOpen]=useState(false);
  const [quality,setQuality]=useState<Quality>(loadQuality),[hint,setHint]=useState(()=>isIOS()&&!isInstalled()&&!installHintDismissed());
@@ -141,7 +145,8 @@ export default function Home(){
  const percent=Math.round(state.explode*100);
  const showBack=hasSelection||!!state.region||state.isolate;
 
- return <main className="studio" data-compact-open={browseOpen||undefined} data-has-detail={hasSelection||quiz.on||undefined}>
+ const starting=!booted&&!error;
+ return <><main className="studio" inert={starting||undefined} data-compact-open={browseOpen||undefined} data-has-detail={hasSelection||quiz.on||undefined}>
   {atlas&&<AnatomyScene key={`${atlas.version}:${quality}`} atlas={atlas} state={state} free={free} calloutRef={calloutRef} apiRef={sceneApi} showCallout={!quiz.on||quiz.callout} onSelect={quiz.on?(id=>setQuizTap(t=>({id,n:(t?.n??0)+1}))):choosePart} onProgress={n=>{setProgress(n);if(n===100)setError('');}} onError={setError}/>}
   <div className="vignette"/>
   <div className="callout" ref={calloutRef} data-side="right" aria-hidden="true"><span className="callout-dot"/><span className="callout-line"/><span className="callout-label">{chosen?.name}</span></div>
@@ -231,12 +236,12 @@ export default function Home(){
    <p className="note">Горизонтальный срез идёт сверху вниз, сагиттальный — слева направо, фронтальный — спереди назад. Вращайте тело, чтобы рассмотреть срез с разных сторон.</p>
   </aside>}
   {toast&&<div className="toast" role="status">{toast}</div>}
-  {progress<100&&!error&&<div className="loading glass" role="status"><span className="spinner"/><div><strong>Готовим анатомию</strong><span>{progress}% · Загружаем {pieces(atlas?.parts.length??(sex==='male'?2234:888))}</span><div className="loading-track"><i style={{width:`${progress}%`}}/></div></div></div>}
+  {booted&&progress<100&&!error&&<div className="loading glass" role="status"><span className="spinner"/><div><strong>Готовим анатомию</strong><span>{progress}% · Загружаем {pieces(atlas?.parts.length??(sex==='male'?2234:888))}</span><div className="loading-track"><i style={{width:`${progress}%`}}/></div></div></div>}
   {error&&<div className="loading glass error" role="alert"><p>{error}</p><button className="plain" onClick={()=>location.reload()}>Перезагрузить</button></div>}
 
   {organ&&<OrganViewer organ={organ} onClose={()=>setOrgan(null)} onSwitch={setOrgan}/>}
 
   {about&&<AboutDialog quality={quality} onQuality={q=>{saveQuality(q);setQuality(q);}} onClose={()=>setAbout(false)}/>}
   {hint&&!organ&&progress>=100&&!hasSelection&&<aside className="install-hint glass" role="note"><div><strong>Поставьте атлас на экран «Домой»</strong><p>Нажмите <Share size={15} aria-hidden="true"/> «Поделиться» и выберите «На экран «Домой»». Атлас откроется без адресной строки и будет работать без интернета.</p></div><button className="icon" aria-label="Скрыть подсказку" onClick={()=>{dismissInstallHint();setHint(false);}}><X size={17}/></button></aside>}
- </main>;
+ </main>{starting&&<StartScreen progress={progress}/>}</>;
 }

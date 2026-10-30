@@ -8,13 +8,25 @@ export interface ChunkInfo {url:string;bytes:number;gzip?:string;gzipBytes?:numb
 /** Decoded geometry chunks are kept for the whole session, so switching sex or opening an organ never downloads the same file twice. */
 const chunks=new Map<string,Promise<ArrayBuffer>>();
 
+/** Bytes received so far per chunk: the start screen turns them into a smooth percentage. */
+const received=new Map<string,number>();
+export const chunkReceived=(chunk:ChunkInfo)=>received.get(chunk.url)??0;
+
+/** Reads the body piece by piece to count bytes; browsers without streaming bodies get the plain response. */
+async function withProgress(response:Response,key:string):Promise<Response>{
+ if(!response.ok||!response.body?.getReader)return response;
+ const reader=response.body.getReader(),parts:Uint8Array[]=[];let got=0;
+ for(;;){const {done,value}=await reader.read();if(done)break;parts.push(value);got+=value.byteLength;received.set(key,got);}
+ return new Response(new Blob(parts as BlobPart[]),{status:response.status,headers:response.headers});
+}
+
 export function fetchChunk(chunk:ChunkInfo):Promise<ArrayBuffer>{
  const known=chunks.get(chunk.url);
  if(known)return known;
  const compressed=!!chunk.gzip;
- const request=fetch(asset(compressed?chunk.gzip!:chunk.url)).then(response=>decodeModelResponse(response,chunk.bytes,compressed));
+ const request=fetch(asset(compressed?chunk.gzip!:chunk.url)).then(response=>withProgress(response,chunk.url)).then(response=>decodeModelResponse(response,chunk.bytes,compressed));
  chunks.set(chunk.url,request);
- request.catch(()=>chunks.delete(chunk.url));
+ request.catch(()=>{chunks.delete(chunk.url);received.delete(chunk.url);});
  return request;
 }
 

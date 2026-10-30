@@ -4,7 +4,7 @@ import {OrbitControls} from 'three/examples/jsm/controls/OrbitControls.js';
 import {RoomEnvironment} from 'three/examples/jsm/environments/RoomEnvironment.js';
 import {mergeGeometries} from 'three/examples/jsm/utils/BufferGeometryUtils.js';
 import {createExplosionLayout} from './explosion-layout';
-import {fetchChunk} from './model-cache';
+import {chunkReceived,fetchChunk} from './model-cache';
 import {PointerTap} from './pointer-tap';
 import {SYSTEMS,isPartVisible,type Atlas,type FreeRect,type SceneState,type SystemId} from './anatomy';
 
@@ -92,7 +92,14 @@ export default function AnatomyScene({atlas,state,free,apiRef,showCallout,callou
   };
   const solids=new Map(SYSTEMS.map(s=>[s.id,materialFor(s.id,'solid')])),ghosts=new Map(SYSTEMS.filter(s=>s.id!=='integumentary').map(s=>[s.id,materialFor(s.id,'ghost')]));
   const ghostMeshes:T.Mesh[]=[];
-  let loaded=0;
+  const finished=new Set<number>(),sizeOf=(i:number)=>atlas.chunks[i].gzipBytes??atlas.chunks[i].bytes,totalSize=atlas.chunks.reduce((sum,_,i)=>sum+sizeOf(i),0);
+  // Percentage of downloaded bytes: it moves smoothly, not one chunk at a time. 100 only once every chunk is built into the scene.
+  const report=()=>{
+   if(finished.size===atlas.chunks.length){onProgress(100);clearInterval(ticker);return;}
+   let got=0;atlas.chunks.forEach((c,i)=>{got+=finished.has(i)?sizeOf(i):Math.min(chunkReceived(c),sizeOf(i));});
+   onProgress(Math.min(99,Math.floor(got/totalSize*100)));
+  };
+  const ticker=setInterval(report,150);
   const loadChunk=async(ci:number)=>{
    const chunk=atlas.chunks[ci],buffer=await fetchChunk(chunk);if(disposed)return;
    const groups=new Map<string,T.BufferGeometry[]>();
@@ -111,7 +118,7 @@ export default function AnatomyScene({atlas,state,free,apiRef,showCallout,callou
     const ghostMaterial=ghosts.get(system as SystemId);
     if(ghostMaterial){const ghost=new T.Mesh(geometry,ghostMaterial);ghost.frustumCulled=false;ghost.renderOrder=2;ghost.visible=ghostActive;scene.add(ghost);ghostMeshes.push(ghost);}
    });
-   lastState=null;loaded++;onProgress(Math.round(loaded/atlas.chunks.length*100));dirty=true;
+   lastState=null;finished.add(ci);report();dirty=true;
   };
   let ghostActive=false;
   (async()=>{try{let cursor=0;await Promise.all(Array.from({length:3},async()=>{while(!disposed&&cursor<atlas.chunks.length){const i=cursor++;await loadChunk(i);}}));if(!disposed){ready=true;dirty=true;}}catch(e){if(!disposed)onError(e instanceof Error?e.message:'Не удалось загрузить анатомию.');}})();
@@ -264,7 +271,7 @@ export default function AnatomyScene({atlas,state,free,apiRef,showCallout,callou
    if(dirty){renderer.render(scene,camera);updateScreenTargets();updateCallout();dirty=false;}
   };animate();
   const contextLost=(e:Event)=>{if(disposed)return;e.preventDefault();onError('Устройство приостановило 3D-сеанс. Перезагрузите страницу, чтобы продолжить.');};renderer.domElement.addEventListener('webglcontextlost',contextLost);
-  return()=>{disposed=true;apiRef.current=null;renderer.clippingPlanes=[];renderer.domElement.removeEventListener('webglcontextlost',contextLost);cancelAnimationFrame(frame);observer.disconnect();controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();};
+  return()=>{disposed=true;clearInterval(ticker);apiRef.current=null;renderer.clippingPlanes=[];renderer.domElement.removeEventListener('webglcontextlost',contextLost);cancelAnimationFrame(frame);observer.disconnect();controls.dispose();geometries.forEach(g=>g.dispose());materials.forEach(m=>m.dispose());scene.traverse(o=>{if(o instanceof T.Mesh&&!geometries.includes(o.geometry)){o.geometry.dispose();const ms=Array.isArray(o.material)?o.material:[o.material];ms.forEach(m=>m.dispose());}});env.dispose();partTexture.dispose();selectionTexture.dispose();markerGeometry.dispose();markerMaterial.dispose();hover.remove();renderer.dispose();renderer.forceContextLoss();renderer.domElement.remove();};
  },[atlas]);
  return <div className="scene" ref={host} style={{background:`radial-gradient(120% 90% at 38% 42%, #131a2a 0%, ${BACKGROUND} 62%)`}}/>;
 }
