@@ -214,6 +214,12 @@ if (wanted('телефон-chromium')) await runSuite('телефон-chromium',
 if (wanted('iphone-webkit')) await runSuite('iphone-webkit', webkit, iphone, {full: false});
 
 fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify({url: base, date: new Date().toISOString(), results: report}, null, 2));
+// В GitHub Actions ошибки и пропуски дублируются аннотациями: их видно на странице запуска без скачивания отчёта.
+if (process.env.GITHUB_ACTIONS) {
+  const data = text => String(text).replace(/%/g, '%25').replace(/\r/g, '%0D').replace(/\n/g, '%0A');
+  const prop = text => data(text).replace(/:/g, '%3A').replace(/,/g, '%2C');
+  for (const r of report) if (r.status !== 'ok') console.log(`::${r.status === 'fail' ? 'error' : 'notice'} title=${prop(`${r.suite}: ${r.name}`)}::${data(r.detail || '(без подробностей)')}`);
+}
 const failed = report.filter(r => r.status === 'fail').length, skippedCount = report.filter(r => r.status === 'skip').length;
 console.log(`\nИтого: ${report.filter(r => r.status === 'ok').length} успешно, ${failed} с ошибкой, ${skippedCount} пропущено. Отчёт и скриншоты: ${outDir}`);
 process.exit(failed ? 1 : 0);
