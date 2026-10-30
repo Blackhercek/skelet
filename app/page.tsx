@@ -243,6 +243,6 @@ export default function Home(){
   {organ&&<OrganViewer organ={organ} onClose={()=>setOrgan(null)} onSwitch={setOrgan}/>}
 
   {about&&<AboutDialog quality={quality} onQuality={q=>{saveQuality(q);setQuality(q);}} onClose={()=>setAbout(false)}/>}
-  {hint&&!organ&&progress>=100&&!hasSelection&&<aside className="install-hint glass" role="note"><div><strong>Поставьте атлас на экран «Домой»</strong><p>Нажмите <Share size={15} aria-hidden="true"/> «Поделиться» и выберите «На экран «Домой»». Атлас откроется без адресной строки и будет работать без интернета.</p></div><button className="icon" aria-label="Скрыть подсказку" onClick={()=>{dismissInstallHint();setHint(false);}}><X size={17}/></button></aside>}
+  {hint&&!organ&&!browseOpen&&!quiz.on&&!sectionOpen&&progress>=100&&!hasSelection&&<aside className="install-hint glass" role="note"><div><strong>Поставьте атлас на экран «Домой»</strong><p>Нажмите <Share size={15} aria-hidden="true"/> «Поделиться» и выберите «На экран «Домой»». Атлас откроется без адресной строки и будет работать без интернета.</p></div><button className="icon" aria-label="Скрыть подсказку" onClick={()=>{dismissInstallHint();setHint(false);}}><X size={17}/></button></aside>}
  </main>{starting&&<StartScreen progress={progress}/>}</>;
 }
