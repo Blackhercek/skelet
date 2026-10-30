@@ -1,6 +1,6 @@
 // Проверка опубликованного атласа в настоящих браузерах (Playwright): Chromium и WebKit (движок Safari и iPhone).
 // Запуск:  node claude-task/verify-deployed.mjs https://логин.github.io/репозиторий/
-// Переменная OUT_DIR задаёт папку для скриншотов и report.json (по умолчанию claude-task/out).
+// Переменная OUT_DIR задаёт папку для скриншотов и report.json (по умолчанию claude-task/out); ONLY — какие наборы запускать.
 // ВНИМАНИЕ: скрипт написан без возможности его запустить — это рабочий черновик. Если он падает из-за самого скрипта, исправьте скрипт.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -52,6 +52,32 @@ async function canvasDraws(page, selector) {
   return `разница скриншотов ${Math.round(difference / 1024)} КБ`;
 }
 
+/** Скачать для работы без интернета → отключить сеть → перезагрузить. model=false: 3D недоступен, проверяем, что страница и скрипты открываются из кэша. */
+async function offlineRoundTrip(page, context, {model, shot}) {
+  const supported = await page.evaluate(() => isSecureContext && 'serviceWorker' in navigator && typeof caches !== 'undefined');
+  if (!supported) return skipped('нет https/service worker в этом браузере');
+  await openBrowse(page);   // на телефоне панель «Обзор» (а в ней кнопка настроек) скрыта, пока её не откроешь
+  await page.locator('.panel-head .icon[aria-label^="Настройки"]').click();
+  await page.locator('.about-dialog .primary', {hasText: 'Скачать'}).click();
+  await page.locator('.about-dialog .primary', {hasText: 'Готово'}).waitFor({timeout: 420000});
+  const controlled = await page.evaluate(async () => { await navigator.serviceWorker.ready; return !!(await navigator.serviceWorker.getRegistration()); });
+  if (!controlled) throw new Error('service worker не зарегистрирован');
+  await page.locator('.about-dialog .close').click();
+  await context.setOffline(true);
+  try {
+    await page.reload({waitUntil: 'load', timeout: 120000});
+    if (model) {
+      await waitReady(page, 180000);
+      if (number(await counter(page)) !== 2229) throw new Error('после перезагрузки без сети модель не открылась');
+    } else {
+      await page.locator('.brand h1').waitFor({timeout: 60000});
+      if (!/Атлас/.test(await page.title())) throw new Error('без сети открылась не та страница');
+    }
+    await shot?.('без-сети');
+    return model ? '' : 'страница, скрипты и данные открываются из кэша (3D в этом браузере недоступен)';
+  } finally { await context.setOffline(false); }
+}
+
 async function runSuite(suite, type, contextOptions, {full}) {
   let browser;
   try {
@@ -71,6 +97,22 @@ async function runSuite(suite, type, contextOptions, {full}) {
   const phone = !!contextOptions.isMobile;
 
   await step(suite, 'страница открывается', async () => { await page.goto(base, {waitUntil: 'load', timeout: 120000}); return page.title(); });
+  const webgl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => false);
+  if (!webgl) {
+    record(suite, '3D (WebGL) в этом headless-браузере', 'skip', 'WebGL недоступен — 3D-проверки пропущены; проверьте вручную на реальном устройстве');
+    await step(suite, 'работа без интернета без 3D (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: false, shot}));
+    await shot('без-webgl'); await browser.close(); return;
+  }
+
+  await step(suite, 'модель загрузилась, счётчик структур', async () => { await waitReady(page); const n = number(await counter(page)); if (n !== 2229) throw new Error(`ожидалось 2229, получено ${n}`); return `${n}`; });
+  await shot('главный-экран');
+  await step(suite, '3D-холст рисует тело', () => canvasDraws(page, '.scene canvas'));
+  if (phone) await step(suite, 'нет горизонтальной прокрутки, нижняя панель на экране', async () => {
+    const m = await page.evaluate(() => { const d = document.querySelector('.dock')?.getBoundingClientRect(); return {scroll: document.documentElement.scrollWidth, width: innerWidth, dock: d && {left: d.left, right: d.right, bottom: d.bottom}, height: innerHeight}; });
+    if (m.scroll > m.width + 1) throw new Error(`страница шире экрана: ${m.scroll} > ${m.width}`);
+    if (!m.dock || m.dock.left < -1 || m.dock.right > m.width + 1 || m.dock.bottom > m.height + 1) throw new Error('нижняя панель выходит за экран');
+  });
+
   await step(suite, 'заставка загрузки: «Загрузка», «Сделано для Женьки», процент, меню закрыто', async () => {
     // Отдельный контекст без service worker: только так Playwright может замедлить файлы моделей и дать увидеть заставку.
     const slowContext = await browser.newContext({...contextOptions, locale: 'ru-RU', serviceWorkers: 'block'});
@@ -89,21 +131,6 @@ async function runSuite(suite, type, contextOptions, {full}) {
       if (number(await counter(slow)) !== 2229) throw new Error('после заставки счётчик структур не 2229');
     } finally { await slowContext.close(); }
   });
-  const webgl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => false);
-  if (!webgl) {
-    record(suite, '3D (WebGL) в этом headless-браузере', 'skip', 'WebGL недоступен — 3D-проверки пропущены; проверьте вручную на реальном устройстве');
-    await shot('без-webgl'); await browser.close(); return;
-  }
-
-  await step(suite, 'модель загрузилась, счётчик структур', async () => { await waitReady(page); const n = number(await counter(page)); if (n !== 2229) throw new Error(`ожидалось 2229, получено ${n}`); return `${n}`; });
-  await shot('главный-экран');
-  await step(suite, '3D-холст рисует тело', () => canvasDraws(page, '.scene canvas'));
-  if (phone) await step(suite, 'нет горизонтальной прокрутки, нижняя панель на экране', async () => {
-    const m = await page.evaluate(() => { const d = document.querySelector('.dock')?.getBoundingClientRect(); return {scroll: document.documentElement.scrollWidth, width: innerWidth, dock: d && {left: d.left, right: d.right, bottom: d.bottom}, height: innerHeight}; });
-    if (m.scroll > m.width + 1) throw new Error(`страница шире экрана: ${m.scroll} > ${m.width}`);
-    if (!m.dock || m.dock.left < -1 || m.dock.right > m.width + 1 || m.dock.bottom > m.height + 1) throw new Error('нижняя панель выходит за экран');
-  });
-
   await step(suite, 'поиск по-русски и карточка структуры', async () => {
     await openBrowse(page);
     await page.locator('.search input').fill('передняя зубчатая');
@@ -155,23 +182,7 @@ async function runSuite(suite, type, contextOptions, {full}) {
     });
   }
 
-  await step(suite, 'работа без интернета (скачать → отключить сеть → перезагрузить)', async () => {
-    const supported = await page.evaluate(() => isSecureContext && 'serviceWorker' in navigator && typeof caches !== 'undefined');
-    if (!supported) return skipped('нет https/service worker в этом браузере');
-    await page.locator('.panel-head .icon[aria-label^="Настройки"]').click();
-    await page.locator('.about-dialog .primary', {hasText: 'Скачать'}).click();
-    await page.locator('.about-dialog .primary', {hasText: 'Готово'}).waitFor({timeout: 420000});
-    const controlled = await page.evaluate(async () => { await navigator.serviceWorker.ready; return !!(await navigator.serviceWorker.getRegistration()); });
-    if (!controlled) throw new Error('service worker не зарегистрирован');
-    await page.locator('.about-dialog .close').click();
-    await context.setOffline(true);
-    try {
-      await page.reload({waitUntil: 'load', timeout: 120000});
-      await waitReady(page, 180000);
-      if (number(await counter(page)) !== 2229) throw new Error('после перезагрузки без сети модель не открылась');
-      await shot('без-сети');
-    } finally { await context.setOffline(false); }
-  });
+  await step(suite, 'работа без интернета (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: true, shot}));
 
   await step(suite, 'нет ошибок в консоли и неудачных запросов', async () => {
     const unique = [...new Set(problems)];
@@ -180,11 +191,14 @@ async function runSuite(suite, type, contextOptions, {full}) {
   await browser.close();
 }
 
+// ONLY=телефон,iphone — запустить только наборы, чьё имя содержит одну из подстрок (по умолчанию все).
+const only = (process.env.ONLY ?? '').split(',').map(s => s.trim()).filter(Boolean);
+const wanted = name => !only.length || only.some(s => name.includes(s));
 const iphone = (({defaultBrowserType, ...options}) => options)(devices['iPhone 13']);
 const pixel = (({defaultBrowserType, ...options}) => options)(devices['Pixel 7']);
-await runSuite('компьютер-chromium', chromium, {viewport: {width: 1280, height: 800}}, {full: true});
-await runSuite('телефон-chromium', chromium, pixel, {full: false});
-await runSuite('iphone-webkit', webkit, iphone, {full: false});
+if (wanted('компьютер-chromium')) await runSuite('компьютер-chromium', chromium, {viewport: {width: 1280, height: 800}}, {full: true});
+if (wanted('телефон-chromium')) await runSuite('телефон-chromium', chromium, pixel, {full: false});
+if (wanted('iphone-webkit')) await runSuite('iphone-webkit', webkit, iphone, {full: false});
 
 fs.writeFileSync(path.join(outDir, 'report.json'), JSON.stringify({url: base, date: new Date().toISOString(), results: report}, null, 2));
 const failed = report.filter(r => r.status === 'fail').length, skippedCount = report.filter(r => r.status === 'skip').length;
