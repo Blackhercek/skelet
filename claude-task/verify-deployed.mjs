@@ -17,6 +17,7 @@ const mark = {ok: '✓', fail: '✗', skip: '–'};
 const record = (suite, name, status, detail = '') => { report.push({suite, name, status, detail}); console.log(`${mark[status]} [${suite}] ${name}${detail ? ' — ' + detail : ''}`); };
 const number = text => Number(String(text ?? '').replace(/\D/g, ''));
 const SKIP = Symbol('skip');
+let webkitOfflineNoise = false;   // после перезагрузки без сети в WebKit консоль сама пишет «internal error»: это шум эмуляции, не ошибка сайта
 
 // После упавшего шага интерфейс может остаться в «чужом» состоянии (открытый тест, карточка) и обрушить все следующие шаги.
 // Поэтому runSuite задаёт recover — возврат на главный экран.
@@ -75,7 +76,7 @@ async function offlineRoundTrip(page, context, {model, shot, problems = [], webk
     try { await page.reload({waitUntil: 'load', timeout: 120000}); }
     catch (error) {
       // Эмуляция «офлайна» в WebKit рвёт запрос раньше service worker: открытие без сети там проверить нельзя.
-      if (isWebkit && /internal error/i.test(String(error?.message))) { problems.length = problemsBefore; return skipped(`${cacheNote}; перезагрузка без сети в headless-WebKit недоступна (ограничение эмуляции) — проверьте на устройстве`); }
+      if (isWebkit && /internal error/i.test(String(error?.message))) { problems.length = problemsBefore; webkitOfflineNoise = true; return skipped(`${cacheNote}; перезагрузка без сети в headless-WebKit недоступна (ограничение эмуляции) — проверьте на устройстве`); }
       throw error;
     }
     if (model) {
@@ -197,7 +198,7 @@ async function runSuite(suite, type, contextOptions, {full}) {
   await step(suite, 'работа без интернета (скачать → отключить сеть → перезагрузить)', () => offlineRoundTrip(page, context, {model: true, shot, problems, webkit: type === webkit}));
 
   await step(suite, 'нет ошибок в консоли и неудачных запросов', async () => {
-    const unique = [...new Set(problems)];
+    const unique = [...new Set(problems)].filter(problem => !(webkitOfflineNoise && /internal error/i.test(problem)));
     if (unique.length) throw new Error(`${unique.length}: ${unique.slice(0, 5).join(' | ')}`);
   });
   await browser.close();
