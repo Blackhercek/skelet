@@ -13,6 +13,11 @@ on:
 permissions:
   contents: read
 
+# Прогон занимает до 45 минут: при новой публикации старый уже не нужен.
+concurrency:
+  group: verify
+  cancel-in-progress: true
+
 jobs:
   verify:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
