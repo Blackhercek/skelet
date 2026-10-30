@@ -1,0 +1,43 @@
+name: Проверка опубликованного сайта
+
+on:
+  workflow_run:
+    workflows: ["Опубликовать атлас на GitHub Pages"]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      url:
+        description: "Адрес атласа (если пусто — стандартный адрес GitHub Pages этого репозитория)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      SITE_URL: ${{ inputs.url || format('https://{0}.github.io/{1}/', github.repository_owner, github.event.repository.name) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Установить Playwright и браузеры (Chromium и WebKit)
+        run: |
+          mkdir -p "$RUNNER_TEMP/pw" && cd "$RUNNER_TEMP/pw"
+          npm init -y >/dev/null
+          npm install playwright
+          npx playwright install --with-deps chromium webkit
+      - name: Проверить сайт
+        run: |
+          cp "$GITHUB_WORKSPACE/claude-task/verify-deployed.mjs" "$RUNNER_TEMP/pw/"
+          cd "$RUNNER_TEMP/pw"
+          OUT_DIR="$GITHUB_WORKSPACE/claude-task/out" node verify-deployed.mjs "$SITE_URL"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: otchet-proverki
+          path: claude-task/out
