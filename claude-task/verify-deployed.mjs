@@ -33,7 +33,7 @@ const skipped = reason => ({[SKIP]: reason});
 
 const counter = page => page.locator('.brand-meta').innerText();
 async function waitReady(page, timeout = 240000) {
-  await page.waitForFunction(() => /\d/.test(document.querySelector('.brand-meta')?.textContent ?? '') && !document.querySelector('.loading'), null, {timeout});
+  await page.waitForFunction(() => /\d/.test(document.querySelector('.brand-meta')?.textContent ?? '') && !document.querySelector('.loading, .start'), null, {timeout});
 }
 async function openBrowse(page) {
   const browse = page.locator('.side-panel.browse');
@@ -71,6 +71,24 @@ async function runSuite(suite, type, contextOptions, {full}) {
   const phone = !!contextOptions.isMobile;
 
   await step(suite, 'страница открывается', async () => { await page.goto(base, {waitUntil: 'load', timeout: 120000}); return page.title(); });
+  await step(suite, 'заставка загрузки: «Загрузка», «Сделано для Женьки», процент, меню закрыто', async () => {
+    // Отдельный контекст без service worker: только так Playwright может замедлить файлы моделей и дать увидеть заставку.
+    const slowContext = await browser.newContext({...contextOptions, locale: 'ru-RU', serviceWorkers: 'block'});
+    try {
+      const slow = await slowContext.newPage();
+      await slow.route(/\.bin\.gz$/, async route => { await new Promise(resolve => setTimeout(resolve, 4000)); await route.continue(); });
+      await slow.goto(base, {waitUntil: 'domcontentloaded', timeout: 120000});
+      await slow.locator('.start').waitFor({state: 'visible', timeout: 60000});
+      const text = await slow.locator('.start').innerText();
+      if (!/Загрузка/.test(text) || !/Сделано для Женьки/.test(text) || !/\d+\s*%/.test(text)) throw new Error(`на заставке нет нужного текста: «${text.replace(/\s+/g, ' ')}»`);
+      await slow.waitForFunction(() => !!document.querySelector('main.studio'), null, {timeout: 60000});
+      const covered = await slow.evaluate(() => [[.5, .5], [.1, .1], [.9, .2], [.5, .9]].every(([x, y]) => document.elementFromPoint(innerWidth * x, innerHeight * y)?.closest('.start')) && !!document.querySelector('main.studio')?.inert);
+      if (!covered) throw new Error('под заставкой виден или доступен интерфейс');
+      await slow.screenshot({path: path.join(outDir, `${suite}-заставка.png`)}).catch(() => {});
+      await slow.locator('.start').waitFor({state: 'detached', timeout: 300000});
+      if (number(await counter(slow)) !== 2229) throw new Error('после заставки счётчик структур не 2229');
+    } finally { await slowContext.close(); }
+  });
   const webgl = await page.evaluate(() => { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); }).catch(() => false);
   if (!webgl) {
     record(suite, '3D (WebGL) в этом headless-браузере', 'skip', 'WebGL недоступен — 3D-проверки пропущены; проверьте вручную на реальном устройстве');
