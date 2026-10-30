@@ -18,9 +18,16 @@ const record = (suite, name, status, detail = '') => { report.push({suite, name,
 const number = text => Number(String(text ?? '').replace(/\D/g, ''));
 const SKIP = Symbol('skip');
 
+// После упавшего шага интерфейс может остаться в «чужом» состоянии (открытый тест, карточка) и обрушить все следующие шаги.
+// Поэтому runSuite задаёт recover — возврат на главный экран.
+let recover = null;
+const plain = text => String(text).replace(/\x1b\[[0-9;]*m/g, '');
 async function step(suite, name, fn) {
   try { const result = await fn(); if (result && result[SKIP]) record(suite, name, 'skip', result[SKIP]); else record(suite, name, 'ok', typeof result === 'string' ? result : ''); }
-  catch (error) { record(suite, name, 'fail', String(error?.message ?? error).split('\n')[0].slice(0, 300)); }
+  catch (error) {
+    record(suite, name, 'fail', plain(error?.message ?? error).split('\n').filter(line => line.trim() && !/^Call log:/.test(line.trim())).slice(0, 5).map(line => line.trim()).join(' ⏎ ').slice(0, 600));
+    try { await recover?.(); } catch { /* страница закрыта — дальше всё равно упадёт с понятной причиной */ }
+  }
 }
 const skipped = reason => ({[SKIP]: reason});
 
@@ -51,7 +58,10 @@ async function runSuite(suite, type, contextOptions, {full}) {
     browser = await type.launch(type === chromium ? {args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-webgl']} : {});
   } catch (error) { record(suite, 'запуск браузера', 'fail', String(error.message).split('\n')[0]); return; }
   const context = await browser.newContext({...contextOptions, locale: 'ru-RU', serviceWorkers: 'allow'});
+  // Без видеокарты WebGL работает программно (≈1 кадр/с): проверки «элемент стабилен» ждут несколько кадров, 30 с по умолчанию мало.
+  context.setDefaultTimeout(120000);
   const page = await context.newPage();
+  recover = async () => { await page.goto(base, {waitUntil: 'load', timeout: 120000}); await waitReady(page, 180000); };
   const problems = [];
   page.on('pageerror', e => problems.push(`pageerror: ${e.message}`));
   page.on('console', m => { if (m.type() === 'error') problems.push(`console: ${m.text()}`); });
