@@ -271,7 +271,7 @@ kbd{font:500 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fain
 .tabs button{font-size:12.5px;padding:0 2px}
 @media (max-width:900px),(max-height:540px){
  .section-panel{right:12px;top:calc(max(10px,env(safe-area-inset-top)) + 100px)}
- .canvas-tools{max-width:none}
+ .canvas-tools{max-width:130px}
 }
 
 /* Quiz */
