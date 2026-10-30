@@ -35,7 +35,7 @@ export default function AboutDialog({quality,onQuality,onClose}:Props){
   </>:<p className="note">Офлайн-режим доступен, когда атлас открыт по защищённому адресу (https) или на этом же устройстве. Подробности — в файле «ЗАПУСК.md».</p>}
 
   <h3>Мужская модель — BodyParts3D</h3><p>2 234 отдельные детали и 3 432 названные структуры эталонной мужской анатомии. © The Database Center for Life Science, лицензия CC BY 4.0.</p>
-  <h3>Женская модель и органы — Human Reference Atlas</h3><p>Женская эталонная сборка (888 деталей, скелет и мышцы представлены частично) и подробные модели сердца, лёгких и головного мозга взяты из 3D-эталонных органов проекта HuBMAP Human Reference Atlas (авторы Kristen Browne и Heidi Schlehlein, лицензия CC BY 4.0). Модели органов одинаковы для обеих моделей тела.</p>
+  <h3>Органы в 3D — Human Reference Atlas</h3><p>Подробные модели сердца, лёгких и головного мозга взяты из 3D-эталонных органов проекта HuBMAP Human Reference Atlas (авторы Kristen Browne и Heidi Schlehlein, лицензия CC BY 4.0).</p>
   <p className="note">Геометрия упрощена для веб-просмотра, цвета и группировки подобраны для удобства изучения, а описания дают общие учебные сведения. Атлас не предназначен для диагностики или хирургического планирования.</p>
   <div className="links"><a href="https://dbarchive.biosciencedbc.jp/en/bodyparts3d/lic.html" target="_blank" rel="noreferrer">Лицензия BodyParts3D <ArrowUpRight size={13}/></a><a href="https://doi.org/10.48539/HBM352.BTSQ.586" target="_blank" rel="noreferrer">Human Reference Atlas <ArrowUpRight size={13}/></a><a href="https://github.com/ashemag/human-atlas" target="_blank" rel="noreferrer">Исходный открытый просмотрщик (MIT) <ArrowUpRight size={13}/></a></div>
  </section></div>;

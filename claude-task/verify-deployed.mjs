@@ -145,13 +145,6 @@ async function runSuite(suite, type, contextOptions, {full}) {
   await page.keyboard.press('Escape');
 
   if (full) {
-    await step(suite, 'переключение Женщина ↔ Мужчина', async () => {
-      await page.locator('.seg.sex button', {hasText: 'Женщина'}).click();
-      await page.waitForFunction(() => { const n = Number((document.querySelector('.brand-meta')?.textContent ?? '').replace(/\D/g, '')); return n > 700 && n < 1000 && !document.querySelector('.loading'); }, null, {timeout: 180000});
-      await shot('женщина');
-      await page.locator('.seg.sex button', {hasText: 'Мужчина'}).click();
-      await page.waitForFunction(() => Number((document.querySelector('.brand-meta')?.textContent ?? '').replace(/\D/g, '')) === 2229 && !document.querySelector('.loading'), null, {timeout: 180000});
-    });
     await step(suite, 'срез тела', async () => {
       await page.locator('.tool[aria-label="Срез тела"]').click();
       await page.locator('.section-panel .seg button', {hasText: 'Сагиттальный'}).click();

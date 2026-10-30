@@ -36,9 +36,10 @@ const pieces=(n:number)=>`${n.toLocaleString('ru-RU')} ${plural(n,['деталь
 const fillStyle=(value:number)=>({'--fill':`${value}%`} as CSSProperties);
 
 export default function Home(){
- const [sex,setSex]=useState<AnatomySex>('male'),[atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(()=>initialState('male'));
+ const sex:AnatomySex='male'; // женская модель убрана; тип и код сохранены, чтобы её можно было вернуть
+ const [atlas,setAtlas]=useState<Atlas|null>(null),[state,setState]=useState(()=>initialState('male'));
  const [progress,setProgress]=useState(0),[error,setError]=useState(''),[chosen,setChosen]=useState<Concept|null>(null);
- // The start screen covers the interface until the body is loaded for the first time; later reloads (sex, quality) use the small card.
+ // The start screen covers the interface until the body is loaded for the first time; later reloads (quality) use the small card.
  const [booted,setBooted]=useState(false);
  useEffect(()=>{if(atlas&&progress>=100)setBooted(true);},[atlas,progress]);
  const [tab,setTab]=useState<Tab>('systems'),[query,setQuery]=useState(''),[searching,setSearching]=useState(false),[active,setActive]=useState(0);
@@ -218,7 +219,6 @@ export default function Home(){
    {showBack&&!quiz.on&&<button className="back-whole" onClick={wholeBody}><RotateCcw size={14}/> Ко всему телу</button>}
    <div className="dock-row">
     <div className="seg views" role="group" aria-label="Вид камеры">{VIEWS.map(v=><button key={v.id} aria-pressed={state.view===v.id} disabled={state.explode>.8&&v.id!=='front'} onClick={()=>setState(s=>({...s,view:v.id,reset:s.reset+1,rotate:false}))}>{v.label}</button>)}</div>
-    <div className="seg sex" role="group" aria-label="Модель">{(['male','female'] as AnatomySex[]).map(x=><button key={x} aria-pressed={sex===x} onClick={()=>setSex(x)}>{x==='male'?'Мужчина':'Женщина'}</button>)}</div>
    </div>
    <div className="spread">
     <div className="spread-head"><label id="spread-label" htmlFor="spread">Развести структуры</label><span className="spread-tools"><button className="reassemble" onClick={()=>setState(s=>({...s,explode:0}))} disabled={state.explode===0}><RotateCcw size={13}/> Собрать</button><output className="pill" htmlFor="spread">{percent}%</output></span></div>
@@ -236,7 +236,7 @@ export default function Home(){
    <p className="note">Горизонтальный срез идёт сверху вниз, сагиттальный — слева направо, фронтальный — спереди назад. Вращайте тело, чтобы рассмотреть срез с разных сторон.</p>
   </aside>}
   {toast&&<div className="toast" role="status">{toast}</div>}
-  {booted&&progress<100&&!error&&<div className="loading glass" role="status"><span className="spinner"/><div><strong>Готовим анатомию</strong><span>{progress}% · Загружаем {pieces(atlas?.parts.length??(sex==='male'?2234:888))}</span><div className="loading-track"><i style={{width:`${progress}%`}}/></div></div></div>}
+  {booted&&progress<100&&!error&&<div className="loading glass" role="status"><span className="spinner"/><div><strong>Готовим анатомию</strong><span>{progress}% · Загружаем {pieces(atlas?.parts.length??2234)}</span><div className="loading-track"><i style={{width:`${progress}%`}}/></div></div></div>}
   {error&&<div className="loading glass error" role="alert"><p>{error}</p><button className="plain" onClick={()=>location.reload()}>Перезагрузить</button></div>}
 
   {organ&&<OrganViewer organ={organ} onClose={()=>setOrgan(null)} onSwitch={setOrgan}/>}

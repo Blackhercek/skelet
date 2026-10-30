@@ -8,7 +8,7 @@
 
 ## 0. Что это за проект (коротко)
 
-- Интерактивный 3D-атлас тела человека на русском. Мужская модель (BodyParts3D, 2 234 детали) и женская (HuBMAP HRA, 888 деталей), детальные сердце/лёгкие/мозг.
+- Интерактивный 3D-атлас тела человека на русском. Мужская модель (BodyParts3D, 2 234 детали), детальные сердце/лёгкие/мозг (HuBMAP HRA). Женская модель по просьбе владельца убрана (данные есть в истории git).
 - Возможности: разведение структур слайдером, виды, слои/системы/области, поиск (русский/латынь/английский), карточка структуры, «Избранное», срез тела, снимок экрана, режим «Проверь себя» (тест), органы в 3D с метками, офлайн-режим (service worker), качество «Лёгкое/Высокое» (на телефоне по умолчанию «Лёгкое»).
 - Только статические файлы. Сборка: `npm run build` → `dist/`. Все адреса относительные (`base: './'`), поэтому работает и из подпапки `https://логин.github.io/репозиторий/`.
 - Данные лежат в `public/models/*.json` + `*.bin.gz`, `public/organs/*`. В `dist/` остаются только `.gz` (приложение распаковывает само).
@@ -57,8 +57,8 @@ npm run build      # должна появиться папка dist/ (≈115 М
 ```sh
 BASE="https://<владелец>.github.io/<репозиторий>/"
 for f in "" index.html manifest.webmanifest sw.js favicon.svg apple-touch-icon.png icon-192.png icon-512.png icon-maskable-512.png \
-         models/atlas.json models/atlas-lite.json models/atlas-female.json models/atlas-female-lite.json \
-         models/names-ru.json models/names-la.json models/body-lite-0.bin.gz models/female-lite-0.bin.gz organs/organs.json organs/organs.bin.gz; do
+         models/atlas.json models/atlas-lite.json \
+         models/names-ru.json models/names-la.json models/body-lite-0.bin.gz organs/organs.json organs/organs.bin.gz; do
   printf '%-34s ' "$f"; curl -s -o /dev/null -w '%{http_code} %{size_download} байт  %{content_type}\n' "$BASE$f"
 done
 ```
@@ -79,8 +79,8 @@ node claude-task/verify-deployed.mjs "$BASE"
 
 Что он проверяет:
 1. Загрузка без ошибок в консоли, без неудачных запросов и ответов ≥ 400.
-2. Счётчик «Видимых структур: 2 229» (мужская модель). Холст WebGL реально рисует (сравнение скриншотов с холстом и без него).
-3. Переключение «Женщина» ↔ «Мужчина».
+2. Стартовый экран: «Загрузка», процент и подпись «Сделано для Женьки»; интерфейс под ним закрыт; после загрузки экран исчезает (файлы моделей для этого замедляются).
+3. Счётчик «Видимых структур: 2 229» (мужская модель). Холст WebGL реально рисует (сравнение скриншотов с холстом и без него).
 4. Поиск по-русски, выбор структуры, карточка («Описание», русское название).
 5. Режим «Проверь себя»: запуск, ответ на вопрос, обратная связь.
 6. Органы в 3D: лёгкие, сердце, мозг; появляются метки; открывается карточка метки.
@@ -104,7 +104,6 @@ node claude-task/verify-deployed.mjs "$BASE"
 | Service worker не регистрируется | не `https`, ошибка в `public/sw.js`, неправильный scope | `node scripts/validate-sw.mjs`; консоль; `navigator.serviceWorker.getRegistrations()` |
 | Офлайн не работает | данные не скачаны в `atlas-data-v1` | `app/offline.ts`, `public/sw.js`; Application → Cache Storage |
 | Чёрный экран на iPhone | нет WebGL2/мало памяти | выбрать «Лёгкое» в настройках; `app/scene.tsx` (`WebGLRenderer`, float-текстуры), консоль |
-| Переключение Мужчина/Женщина ломает области | регрессия | `node scripts/validate-regions.mjs` |
 | Русские названия не подставились | не загрузился `names-ru.json` | `app/localize.ts`, `scripts/validate-names.mjs` |
 
 После любого изменения кода: `npm run validate && npm run build`, коммит, push, дождаться публикации, повторить раздел 4.

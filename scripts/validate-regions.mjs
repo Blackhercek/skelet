@@ -16,16 +16,11 @@ const EXPECT = {
     [/^(cerebellum|mandible|pons|midbrain|(left|right) eyeball|(left|right) .*gyrus)$/i, 'head'],
     [/(coronary|wall of ventricle|cavity of (left|right) ventricle|atrium|pulmonary valve|mitral|tricuspid|segmental bronchial tree|trachea|sternum|\brib\b|serratus anterior)/i, 'thorax'],
   ],
-  'atlas-female.json': [
-    [/(trachea|heart|cardiac atrium|bronchopulmonary|\brib)/i, 'thorax'],
-    [/(kidney|liver|pancreas|stomach|spleen)/i, 'abdomen'],
-    [/(urinary bladder|uterus|vagina|ovary)/i, 'pelvis'],
-  ],
 };
 let failures = 0;
-for (const file of ['atlas.json', 'atlas-female.json']) {
+for (const file of ['atlas.json']) {
   const atlas = assignRegions(JSON.parse(fs.readFileSync(new URL(`../public/models/${file}`, import.meta.url), 'utf8')));
-  // Switching sex re-uses the cached atlas: regions must not change after the names became Russian.
+  // The cached atlas is localized after loading: regions must not change after the names became Russian.
   const snapshot = atlas.parts.map(p => p.region).join();
   assignRegions(localizeAtlas(atlas, dict));
   if (atlas.parts.map(p => p.region).join() !== snapshot) { failures++; console.log(`  ✗ ${file}: regions changed after localization`); }

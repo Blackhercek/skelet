@@ -129,7 +129,6 @@ kbd{font:500 11px/1 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fain
 .seg button{height:34px;padding:0 14px;border-radius:9px;font-size:13px;font-weight:550;color:var(--muted);white-space:nowrap}
 .seg button:hover:not(:disabled):not([aria-pressed=true]){color:var(--text)}
 .seg button[aria-pressed=true]{background:rgba(255,255,255,.14);color:#fff}
-.seg.sex button[aria-pressed=true]{background:var(--accent)}
 .seg button:disabled{opacity:.35}
 .spread{margin-top:12px}
 .spread-head{display:flex;align-items:center;justify-content:space-between;gap:10px}

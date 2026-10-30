@@ -6,7 +6,7 @@ import {localizeAtlas} from '../app/localize.ts';
 import {SCOPES, buildPool, makeOptions, makeRound, shuffle, ROUND_LENGTH} from '../app/quiz-logic.ts';
 
 const dict = JSON.parse(fs.readFileSync(new URL('../public/models/names-ru.json', import.meta.url), 'utf8'));
-for (const file of ['atlas.json', 'atlas-female.json']) {
+for (const file of ['atlas.json']) {
   const atlas = localizeAtlas(assignRegions(JSON.parse(fs.readFileSync(new URL(`../public/models/${file}`, import.meta.url), 'utf8'))), dict);
   const report = [];
   for (const scope of Object.keys(SCOPES)) for (const mode of ['identify', 'locate']) for (const level of ['main', 'all']) {
