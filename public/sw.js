@@ -24,6 +24,28 @@ self.addEventListener('fetch', event => {
   else event.respondWith(cacheFirst(request, isData(url) ? DATA : SHELL));
 });
 
+/** «Скачать для работы без интернета»: страница просит сохранить саму себя и свои файлы.
+ * Иначе при первом запуске без сети открывать нечего: под контролем worker'а страница и скрипты ещё ни разу не загружались. */
+self.addEventListener('message', event => {
+  if (event.data?.type !== 'cache-shell' || !Array.isArray(event.data.urls)) return;
+  const reply = event.ports?.[0];
+  event.waitUntil((async () => {
+    try {
+      const cache = await caches.open(SHELL);
+      for (const href of new Set(event.data.urls)) {
+        const url = new URL(href);
+        if (url.origin !== self.location.origin) continue;
+        const response = await fetch(url.href);
+        if (!response.ok) throw new Error(`${response.status} ${url.href}`);
+        await cache.put(url.href, response);
+      }
+      reply?.postMessage({ok: true});
+    } catch (error) {
+      reply?.postMessage({ok: false, error: String(error?.message ?? error)});
+    }
+  })());
+});
+
 /** Страница: берём свежую из сети, а без сети (или при слабом сигнале) — сохранённую. */
 async function pageFirstOnline(request) {
   const cache = await caches.open(SHELL);

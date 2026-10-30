@@ -11,8 +11,23 @@ export const offlineSupported=()=>typeof caches!=='undefined'&&window.isSecureCo
 /** Approximate download size in MB. */
 export const offlineSize=(quality:Quality)=>quality==='lite'?32:67;
 
-/** Saves everything the atlas needs (both bodies at the chosen quality, the organs and the Russian names) on the device. */
+/** Asks the service worker to keep the page and its scripts/styles/icons: before that only data is on the device and the first offline start finds no page. */
+async function saveShell(){
+ const timeout=(ms:number)=>new Promise<never>((_,reject)=>setTimeout(()=>reject(new Error('service worker')),ms));
+ const worker=(await Promise.race([navigator.serviceWorker.ready,timeout(20000)])).active;
+ if(!worker)throw new Error('service worker');
+ const files=[...document.querySelectorAll<HTMLScriptElement|HTMLLinkElement>('script[src],link[href]')].map(el=>el instanceof HTMLScriptElement?el.src:el.href);
+ const urls=[...new Set([new URL('./',location.href).href,new URL('./index.html',location.href).href,...files])];
+ await Promise.race([new Promise<void>((resolve,reject)=>{
+  const channel=new MessageChannel();
+  channel.port1.onmessage=e=>e.data?.ok?resolve():reject(new Error(e.data?.error??'shell'));
+  worker.postMessage({type:'cache-shell',urls},[channel.port2]);
+ }),timeout(60000)]);
+}
+
+/** Saves everything the atlas needs (the page itself, both bodies at the chosen quality, the organs and the Russian names) on the device. */
 export async function downloadForOffline(quality:Quality,onProgress:(done:number,total:number)=>void){
+ await saveShell();
  const urls=[NAMES_URL,ORGANS_URL];
  for(const sex of ['male','female'] as const){
   const url=atlasUrl(sex,quality),manifest=await fetchJson<Atlas>(url);

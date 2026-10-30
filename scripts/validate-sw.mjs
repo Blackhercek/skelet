@@ -64,4 +64,22 @@ assert.equal(await dispatch('fetch', {request: {url: 'https://other.example/x.js
 stores.set('atlas-shell-old-build', new Map()); stores.set('atlas-data-v1', stores.get('atlas-data-v1') ?? new Map());
 await dispatch('activate');
 assert.ok(!stores.has('atlas-shell-old-build') && stores.has('atlas-data-v1'));
+// 5. First start offline: nothing was ever opened under the worker's control, the page asks it to save the interface while online.
+stores.clear(); online = true; networkLog.length = 0;
+const replies = []; const port = {postMessage: message => replies.push(message)};
+const shellUrls = [`${origin}/`, `${origin}/index.html`, `${origin}/assets/app.js`, `${origin}/assets/app.css`, 'https://other.example/ignored.js'];
+assert.equal(await dispatch('message', {data: {type: 'something-else', urls: shellUrls}, ports: [port]}), undefined);
+assert.equal(await dispatch('message', {data: {type: 'cache-shell'}, ports: [port]}), undefined);
+assert.equal(replies.length, 0, 'unrelated messages get no reply');
+await dispatch('message', {data: {type: 'cache-shell', urls: shellUrls}, ports: [port]});
+assert.ok(replies.length === 1 && replies[0].ok === true, 'the page is told the interface is saved');
+assert.ok(!networkLog.some(url => url.startsWith('https://other.example')), 'other origins are never fetched');
+online = false;
+const firstOffline = await dispatch('fetch', {request: request('/', 'navigate')});
+assert.equal(firstOffline.status, 200, 'the saved page opens on the very first offline start');
+assert.equal(await (await dispatch('fetch', {request: request('/assets/app.js')})).text(), `network:${origin}/assets/app.js`, 'scripts come from the cache too');
+assert.equal((await dispatch('fetch', {request: request('/assets/other.js')})).status, 503);
+online = true; replies.length = 0;
+await dispatch('message', {data: {type: 'cache-shell', urls: [`${origin}/ok.js`, 'not a url']}, ports: [port]});
+assert.equal(replies[0]?.ok, false, 'a bad address is reported as a failure, not a silent success');
 console.log('service worker logic ok');
