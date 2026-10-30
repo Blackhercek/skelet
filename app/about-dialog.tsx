@@ -17,7 +17,7 @@ export default function AboutDialog({quality,onQuality,onClose}:Props){
  const supported=offlineSupported();
  return <div className="modal" role="presentation" onMouseDown={e=>{if(e.target===e.currentTarget)onClose();}}><section ref={dialog} className="about-dialog glass" role="dialog" aria-modal="true" aria-labelledby="about-title">
   <button ref={close} className="icon close" onClick={onClose} aria-label="Закрыть"><X size={18}/></button>
-  <p className="eyebrow">Настройки и сведения</p><h2 id="about-title">Тело — деталь за деталью</h2>
+  <p className="eyebrow">Настройки и сведения</p><h2 id="about-title">Тело — деталь за деталью</h2><p className="made-for">Сделано для Женьки</p>
   <p>Изучайте анатомию взрослого человека по частям: разводите каждую структуру в стороны, снимайте слои, ищите структуры по названию и открывайте сердце, лёгкие и головной мозг в 3D. Названия даны на русском, латинском (по Terminologia Anatomica, где есть устоявшийся термин) и английском языках.</p>
 
   <h3>Качество 3D-модели</h3>

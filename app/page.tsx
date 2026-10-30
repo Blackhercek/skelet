@@ -155,6 +155,7 @@ export default function Home(){
   <header className="brand">
    <div className="brand-row"><h1>Атлас тела человека</h1><span className="beta">3D</span></div>
    <p className="brand-meta"><span className="status-dot"/>Видимых структур: {visibleCount.toLocaleString('ru-RU')}{caption&&<> <b>·</b> {caption}</>}</p>
+   <p className="brand-credit">Сделано для Женьки</p>
   </header>
   <div className="canvas-tools">
    <button className="tool" onClick={()=>setState(s=>({...s,rotate:!s.rotate}))} disabled={state.explode>=.4||state.isolate} aria-pressed={state.rotate} aria-label={state.rotate?'Остановить вращение':'Вращать тело'} title="Автовращение">{state.rotate?<Pause size={17}/>:<RotateCw size={17}/>}</button>
